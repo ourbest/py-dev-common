@@ -8,8 +8,8 @@ from django.http import HttpRequest
 from django.http import JsonResponse as ApiJsonResponse
 from django.http.response import HttpResponseBase
 
+from commons import *
 from . import errors
-from .errors import ApiException
 
 
 def get_post_string(request, name):
@@ -202,14 +202,6 @@ class JsonResponse(ApiJsonResponse):
         super(JsonResponse, self).__init__(data, **kwargs)
 
 
-PLATFORM_IOS = 'ios'
-PLATFORM_ANDROID = 'android'
-PLATFORM_WEB = 'web'
-PLATFORM_WX = 'wx'
-PLATFORM_WX_CYCLE = 'wxcycle'
-PLATFORM_TRD = 'trd'
-
-
 def get_client_platform(request):
     """
 
@@ -384,35 +376,3 @@ def api_json_handler_wrapper(api_handle_func):
 
 _dummy = RequestContext()
 logger = logging.getLogger(__name__)
-
-
-class ResultItem(dict):
-    def __setattr__(self, key, value):
-        if not isinstance(value, ResultItem) and isinstance(value, dict):
-            self[key] = ResultItem()
-            for k, v in value.items():
-                self[key].__setattr__(k, v)
-        else:
-            self[key] = value
-
-    def __getattr__(self, key):
-        return self.get(key)
-
-    def __getitem__(self, item):
-        return self.get(item)
-
-    def __setitem__(self, key, value):
-        if not isinstance(value, ResultItem) and isinstance(value, dict):
-            self.__setattr__(key, value)
-        else:
-            super().__setitem__(key, value)
-
-    def __init__(self, **kwargs):
-        super().__init__()
-        for argk, argv in kwargs.items():
-            self[argk] = argv
-
-
-class ApiResult(ResultItem):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
