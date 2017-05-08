@@ -190,7 +190,7 @@ def _process_api(get_response, request, anonymous=False, **kwargs):
     #     return get_response(request)
     if isinstance(response, HttpResponseBase):
         return response
-    if response and hasattr(response, 'dict'):
+    if response and not isinstance(response, dict) and hasattr(response, 'dict'):
         response = response.dict()
 
     if not response or 'return_code' not in response:

@@ -1,6 +1,22 @@
 class ResultItem(dict):
+    @staticmethod
+    def from_dict(d):
+        ret = ResultItem(**d)
+        return ret
+
+    @staticmethod
+    def _parse_item(x):
+        if isinstance(x, dict):
+            return ResultItem.from_dict(x)
+        elif isinstance(x, (set, list, tuple)) and len(x) > 0:
+            return [ResultItem._parse_item(y) for y in x]
+        else:
+            return x
+
     def __setattr__(self, key, value):
-        if not isinstance(value, ResultItem) and isinstance(value, dict):
+        if isinstance(value, (set, list, tuple)) and len(value) > 0:
+            super().__setitem__(key, ResultItem._parse_item(value))
+        elif not isinstance(value, ResultItem) and isinstance(value, dict):
             self[key] = ResultItem()
             for k, v in value.items():
                 self[key].__setattr__(k, v)
@@ -14,7 +30,7 @@ class ResultItem(dict):
         return self.get(item)
 
     def __setitem__(self, key, value):
-        if not isinstance(value, ResultItem) and isinstance(value, dict):
+        if not isinstance(value, ResultItem) and isinstance(value, (dict, list, set, tuple)) and len(value) > 0:
             self.__setattr__(key, value)
         else:
             super().__setitem__(key, value)
@@ -34,7 +50,6 @@ class ApiException(Exception):
     def __init__(self, code, message):
         self.code = code
         self.message = message
-
 
 
 PLATFORM_IOS = 'ios'
