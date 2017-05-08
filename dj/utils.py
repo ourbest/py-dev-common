@@ -104,12 +104,14 @@ def get_client_ip(request):
     return ip
 
 
-def _parse_request(anonymous, get_response, request):
+def _parse_request(anonymous, get_response, request, **kwargs):
     ctx = get_request_context()
     sig = inspect.signature(get_response)
     args = []
     for p in sig.parameters:
-        if "request" == p:
+        if p in kwargs:
+            args.append(kwargs[p])
+        elif "request" == p:
             args.append(request)
         elif "user_id" == p:
             user_id = ctx.user_id
@@ -137,21 +139,21 @@ def get_request_context(request=None):
 
 
 def api_func(get_response):
-    def middleware(*args):
+    def middleware(*args, **kwargs):
         if len(args) == 1 and isinstance(args[0], HttpRequest):
-            return _process_api(get_response, *args)
+            return _process_api(get_response, *args, **kwargs)
         else:
-            get_response(*args)
+            get_response(*args, **kwargs)
 
     return middleware
 
 
 def api_func_anonymous(get_response):
-    def middleware(*args):
+    def middleware(*args, **kwargs):
         if len(args) == 1 and isinstance(args[0], HttpRequest):
-            return _process_api(get_response, *args, anonymous=True)
+            return _process_api(get_response, *args, anonymous=True, **kwargs)
         else:
-            get_response(*args)
+            get_response(*args, **kwargs)
 
     return middleware
 
@@ -167,7 +169,7 @@ def init_request_context(request):
     return request_context.ctx
 
 
-def _process_api(get_response, request, anonymous=False):
+def _process_api(get_response, request, anonymous=False, **kwargs):
     if not hasattr(request_context, 'ctx'):
         init_request_context(request)
 
@@ -180,7 +182,7 @@ def _process_api(get_response, request, anonymous=False):
 
     # if request.path_info.startswith('/api') or request.path_info.startswith('/cms/api'):
     try:
-        args = _parse_request(anonymous, get_response, request)
+        args = _parse_request(anonymous, get_response, request, **kwargs)
         response = get_response(*args)
     except ApiException as e:
         response = api_response(data={}, return_code=e.code, return_msg=e.message)
