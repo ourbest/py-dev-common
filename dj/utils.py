@@ -1,6 +1,6 @@
+import hashlib
 import inspect
 import logging
-import re
 import threading
 from datetime import datetime
 
@@ -12,10 +12,18 @@ from commons import *
 from . import errors
 
 
+def md5_hex(text):
+    hash_md5 = hashlib.md5()
+    hash_md5.update(text.encode())
+    return hash_md5.hexdigest()
+
+
 def get_post_string(request, name):
-    value = request.POST.get(name)
-    if value:
-        return value
+    if request:
+        value = request.POST.get(name)
+        if value:
+            return value
+
     return ""
 
 
@@ -32,6 +40,9 @@ def get_param_string(request, name):
 
 
 def get_post_date(request, name, layout):
+    if not request:
+        return None
+
     value = request.POST.get(name)
     if not value:
         return None
@@ -42,6 +53,9 @@ def get_post_date(request, name, layout):
 
 
 def get_param_int(request, name, default_value=0):
+    if not request:
+        return default_value
+
     try:
         return get_post_int(request, name) if request.method == "POST" else get_get_int(request, name)
     except:
@@ -49,6 +63,9 @@ def get_param_int(request, name, default_value=0):
 
 
 def get_post_int(request, name):
+    if not request:
+        return 0
+
     value = request.POST.get(name)
     if value:
         return int(value)
@@ -56,6 +73,9 @@ def get_post_int(request, name):
 
 
 def get_get_string(request, name):
+    if not request:
+        return ""
+
     value = request.GET.get(name)
     if value:
         return value
@@ -63,6 +83,9 @@ def get_get_string(request, name):
 
 
 def get_get_int(request, name):
+    if not request:
+        return 0
+
     value = request.GET.get(name)
     if value:
         return int(value)
@@ -79,6 +102,9 @@ def get_cookie_string(request, name):
 
 
 def get_cookie_int(request, name):
+    if not request:
+        return 0
+
     value = request.COOKIES.get(name)
     if value:
         return int(value)
@@ -86,6 +112,9 @@ def get_cookie_int(request, name):
 
 
 def get_header(request, name):
+    if not request:
+        return None
+
     return request.META.get('HTTP_' + name.upper())
 
 
@@ -96,6 +125,9 @@ def get_client_ip(request):
     """
     从请求拿到用户的ip
     """
+    if not request:
+        return None
+
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
         ip = x_forwarded_for.split(',')[0]
@@ -233,13 +265,19 @@ def get_client_platform(request):
 
 
 def get_session_id(request):
-    session_id = get_param_string(request, "session_id")
-    if session_id == "":
-        session_id = get_cookie_string(request, "session_id")
+    session_id = get_header(request, "x-sess")
+    if not session_id:
+        session_id = get_param_string(request, "session_id")
+        if session_id == "":
+            session_id = get_cookie_string(request, "session_id")
+
     return session_id
 
 
 def get_scheme(request):
+    if not request:
+        return None
+
     host = request.get_host()
     if 'com' in host and 'test' not in host:
         return 'https'
@@ -258,7 +296,8 @@ class RequestContext:
             return
         self.ua = request.META.get('HTTP_USER_AGENT', '') if request else ""
         self.platform = get_client_platform(request) if request else ""
-        self.app = get_param_string(request, 'app') if request else ""
+        app = get_header(request, "x-app")
+        self.app = app if app else get_param_string(request, 'app') if request else ""
 
         self.version = ""
 
@@ -268,7 +307,10 @@ class RequestContext:
             self.app = 'miaojie'
 
         self.ip = get_client_ip(request) if request else ""
-        self.device_guid = get_param_string(request, 'device_guid')
+
+        dev = get_header(request, 'x-device')
+
+        self.device_guid = dev if dev else get_param_string(request, 'device_guid')
         self.client_type = 'b' if self.app.endswith('_b') else 'c'
         self.session_id = get_session_id(request)
         self.user_id = 0
@@ -277,48 +319,11 @@ class RequestContext:
         self.scheme = get_scheme(request) if request else ""
         self.method = request.method if request else ""
         self.path = request.get_full_path() if request else ""
-        self.version_code = get_param_int(request, 'version_code', 0)
+        ver = get_header(request, 'x-ver')
+
+        self.version_code = get_param_int(request, 'version_code', 0) if not ver else int(ver)
 
         self.is_wx = "MicroMessenger" in self.ua
-
-        try:
-            if self.platform == PLATFORM_ANDROID:
-                # volley/1.0.0 79kjA jiyongqian_c JYQDK/1.1.2
-                if '79kjA' in self.ua:
-                    self.is_in_app = True
-                    elems = self.ua.split(' ')
-                    if len(elems) > 3:
-                        if not self.app:
-                            self.app = elems[2]
-                        elems__split = elems[3].split('/')
-                        if len(elems__split) > 1:
-                            self.version = elems__split[1]
-                        else:
-                            logger.info("ua - %s " % self.ua)
-
-                        result = re.search('\\[(.+?)\\]', self.ua)
-                        if result:
-                            self.phone = result.group(1)
-
-            elif self.platform == PLATFORM_IOS:
-                if '79kjI' in self.ua:
-                    self.is_in_app = True
-                    elems = self.ua.split(' ')
-                    if len(elems) > 2:
-                        if not self.app:
-                            self.app = elems[1]
-                        elems__split = elems[2].split('/')
-                        if len(elems__split) > 1:
-                            self.version = elems__split[1]
-                        else:
-                            logger.info("ua - %s " % self.ua)
-
-                        result = re.search('\\[(.+?)\\]', self.ua)
-                        if result:
-                            self.phone = result.group(1)
-
-        except Exception as e:
-            logger.warning("error parse {}".format(e), exc_info=True)
 
 
 ### response
