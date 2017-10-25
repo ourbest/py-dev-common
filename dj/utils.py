@@ -175,7 +175,7 @@ def api_func(get_response):
         if len(args) == 1 and isinstance(args[0], HttpRequest):
             return _process_api(get_response, *args, **kwargs)
         else:
-            get_response(*args, **kwargs)
+            return get_response(*args, **kwargs)
 
     return middleware
 
@@ -185,7 +185,7 @@ def api_func_anonymous(get_response):
         if len(args) == 1 and isinstance(args[0], HttpRequest):
             return _process_api(get_response, *args, anonymous=True, **kwargs)
         else:
-            get_response(*args, **kwargs)
+            return get_response(*args, **kwargs)
 
     return middleware
 
